@@ -7,10 +7,12 @@ Resources:
     Properties:
       Handler: index.handler
       Runtime: nodejs6.10
-      CodeUri: ./
+      CodeUri: ./timeResource
       Events:
         MyTimeApi:
           Type: Api
           Properties:
             Path: /TimeResource
             Method: GET
+
+
