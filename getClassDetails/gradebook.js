@@ -21,8 +21,14 @@ aws.config.update({
 });
 const docClient = new aws.DynamoDB({ apiVersion: '2012-08-10' });
 
+function errorMsg(msg) {
+    return {
+        "Error": msg
+    };
+}
+
 exports.handler = (event, context, callback) => {
-    var userId = event.user_id;
+    //var userId = event.user_id;
     //var userId = 'f990ec30-19f0-11e8-80cc-efc14beec333';
     var res = {};
 
@@ -36,6 +42,9 @@ exports.handler = (event, context, callback) => {
             }
             }
         };
+        var projectObject = {"$project":{"_id":0,"statement":1}};
+		
+        queryArray.push(projectObject);
         queryArray.push(matchObject);
         console.log('query'+JSON.stringify(queryArray));
         var propertiesObject = { pipeline: JSON.stringify(queryArray) };
@@ -51,12 +60,21 @@ exports.handler = (event, context, callback) => {
 
         };
         request(aggregateRequestOptions, function(err, response, body) {
-            if (err) { console.log(err); return; }
+            if (err) {
+                console.log(err);
+                returnResponse(500,errorMsg("Unexpected Error : " + err));
+                return;
+            }
+            if (!body) {
+                log('error', 'No records found');
+                returnResponse(400,errorMsg('No statements found for ' + userIdList));
+                return;
+            }
 
             console.log("Get response: " + response.statusCode);
             //console.log(JSON.parse(body));
             var aggResponse = JSON.parse(body);
-            //res["aggregate"] = aggResponse;
+            res["aggregate"] = aggResponse;
             var extIds = [];
             var dyanmoKeyJson = [];
             for (var i = 0; i < aggResponse.length; i++) {
@@ -69,13 +87,12 @@ exports.handler = (event, context, callback) => {
             }
             console.log(extIds);
             console.log(JSON.stringify(res));
-           getDynamoDbResponse(dyanmoKeyJson);
+            getDynamoDbResponse(dyanmoKeyJson);
         });
     }
 
     function getDynamoDbResponse(keyJson) {
         var table = 'GradeBookSample';
-        var extId = ['OUPDIS03'];
         
         var requestitems = {};
         requestitems[table] = {
@@ -87,19 +104,20 @@ exports.handler = (event, context, callback) => {
         docClient.batchGetItem(params, function(err, data) {
             if (err) {
                 console.log(err);
+                returnResponse(500,errorMsg("Unexpected Error : "+err));
                 return;
             }
             else {
                 console.log(data.Responses[table]);
                 res["dyanmo data"] = data.Responses[table];
                 console.log('final result' + JSON.stringify(res));
-                callback(null, res);
+                returnResponse(200, res);
             }
         });
         
         console.log(res);
     }
-    getClassDetails();
+    getAggregateResponse();
 
     function getClassDetails() {
         const assumeRoleParams = {
@@ -165,6 +183,15 @@ exports.handler = (event, context, callback) => {
                 request.end();
             }
         });
+    }
+    function returnResponse(status,resp) {
+        var responseApi = {
+            "statusCode": status,
+            "isBase64Encoded": false,
+            "body": JSON.stringify(resp)
+
+        };
+        callback(null, responseApi);
     }
 
 }

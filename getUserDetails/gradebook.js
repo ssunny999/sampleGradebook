@@ -1,9 +1,6 @@
 'use strict';
 var request = require('request');
 const aws = require('aws-sdk');
-const sts = new aws.STS();
-const awss = require('aws4');
-const https = require('https');
 
 const logLevels = { error: 4, warn: 3, info: 2, verbose: 1, debug: 0 };
 
@@ -22,11 +19,23 @@ aws.config.update({
 });
 const docClient = new aws.DynamoDB({ apiVersion: '2012-08-10' });
 
-exports.handler = (event, context, callback) => {
-    //var userId = event.user_id;
-    var userId = 'f990ec30-19f0-11e8-80cc-efc14beec333';
-    var res = {};
+function errorMsg(msg) {
+    return {
+        "Error": msg
+    };
+}
 
+exports.handler = (event, context, callback) => {
+    var userId = event.pathParameters.user_id;
+    log("debug", "userId: " + userId);
+    if (!userId) {
+        log('error', 'User id is null');
+        returnResponse(400,errorMsg('User id is invalid' + userId));
+        return;
+    }
+    //var userId = 'f990ec30-19f0-11e8-80cc-efc14beec333';
+    var res = {};
+    console.log('event : ' + JSON.stringify(event));
 
     function getXApiResponse() {
         const requestOptions = {
@@ -53,7 +62,34 @@ exports.handler = (event, context, callback) => {
     }
 
     function getAggregateResponse() {
-        var propertiesObject = { pipeline: '[{"$match": { "statement.actor.account.name" : "' + userId + '"}}]' };
+
+        var queryArray = [{ "$project": { "_id": 0, "statement": 1 } }, {
+            "$match": {
+                "statement.actor.account.name": userId
+            }
+        }];
+        if (event.queryStringParameters) {
+            var endPosition = event.queryStringParameters.endPosition;
+            var startPosition = event.queryStringParameters.startPosition;
+            console.log('endp' + endPosition);
+            if (startPosition != null && !isNaN(startPosition) && endPosition != null && !isNaN(endPosition)) {
+                var limitObject = { "$limit": parseInt(endPosition) };
+                var skipObject = { "$skip": (startPosition - 1) };
+                if (parseInt(endPosition) < parseInt(startPosition)) {
+                    log('error', 'endPosition must be greater than startPosition');
+                    returnResponse(400,errorMsg('endPosition must be greater than startPosition'));
+                    return;
+                }
+                queryArray.push(limitObject);
+                queryArray.push(skipObject);
+            }
+            else if (endPosition != null && !isNaN(endPosition)) {
+                console.log("limit applied");
+                queryArray.push({ "$limit": parseInt(endPosition) });
+            }
+        }
+        console.log('queryArray' + JSON.stringify(queryArray));
+        var propertiesObject = { pipeline: JSON.stringify(queryArray) };
         const aggregateRequestOptions = {
             uri: 'https://lrs-uat.oup.com/API/statements/aggregate',
             method: 'GET',
@@ -66,25 +102,39 @@ exports.handler = (event, context, callback) => {
 
         };
         request(aggregateRequestOptions, function(err, response, body) {
-            if (err) { console.log(err); return; }
-
-            console.log("Get response: " + response.statusCode);
-            //console.log(JSON.parse(body));
-            for (var i = 0; i < JSON.parse(body).length; i++) {
-                res["aggregate"] = JSON.parse(body);
+            if (err) {
+                console.log(err);
+                returnResponse(500,errorMsg("Unexpected Error : " + err));
+                return;
+            }
+            log('debug', 'body : ' + body);
+            if (!body) {
+                log('error', 'No records found');
+                returnResponse(400,errorMsg('No statements found for ' + userId));
+                return;
+            }
+            var aggResponse = JSON.parse(body);
+            res["aggregate"] = aggResponse;
+            var extIds = [];
+            var dyanmoKeyJson = [];
+            for (var i = 0; i < aggResponse.length; i++) {
+                var id = aggResponse[i].statement.object.id.split("/")[4];
+                if (!(id in extIds)) {
+                    extIds[id] = id;
+                    dyanmoKeyJson.push({ EXTERNAL_ID: { S: id } });
+                }
 
             }
+            console.log(extIds);
+            //console.log(JSON.stringify(res));
+            getDynamoDbResponse(dyanmoKeyJson);
 
-            console.log(JSON.stringify(res));
-            getXApiResponse();
         });
     }
 
-    function getDynamoDbResponse() {
+    function getDynamoDbResponse(keyJson) {
         var table = 'GradeBookSample';
-        var extId = ['OUPDIS03'];
-        var keyJson = [];
-        keyJson.push({ EXTERNAL_ID: { S: "OUPDIS03" } });
+        keyJson = [{ EXTERNAL_ID: { S: 'OUPDIS03' } }];
         var requestitems = {};
         requestitems[table] = {
             Keys: keyJson,
@@ -95,27 +145,26 @@ exports.handler = (event, context, callback) => {
         docClient.batchGetItem(params, function(err, data) {
             if (err) {
                 console.log(err);
+                returnResponse(500,errorMsg("Unexpected Error : "+err));
                 return;
             }
             else {
                 console.log(data.Responses[table]);
-                res["dyanmo data"] = JSON.parse(data.Responses[table]);
+                res["dyanmo data"] = data.Responses[table];
                 console.log('final result' + JSON.stringify(res));
+                returnResponse(200,res);
             }
         });
-        callback(null, res);
+
         console.log(res);
     }
     getUserAccount();
+    //getDynamoDbResponse([]);
 
     function getUserAccount() {
-        const assumeRoleParams = {
-            DurationSeconds: 900,
-            RoleArn: 'arn:aws:iam::488628712875:role/GradeBookSampleRole',
-            RoleSessionName: 'GetUserAccount'
-        };
-        var reqBody = { "userId":userId };
-        const aggregateRequestOptions = {
+
+        var reqBody = { "userId": userId };
+        const requestOptions = {
             uri: 'https://rightsuite-elb.eit-primary.eit.access.the-infra.com/acesWebService/rest/V1.0/services/getUserAccount',
             method: 'POST',
             headers: {
@@ -124,86 +173,41 @@ exports.handler = (event, context, callback) => {
             body: JSON.stringify(reqBody)
 
         };
-        request(aggregateRequestOptions, function(err, response, body) {
-            if (err) { console.log(err); return; }
-
-            console.log("Get response: " + response.statusCode);
-            
-            console.log(JSON.parse(body));
-            //for (var i = 0; i < JSON.parse(body).length; i++) {
-                res["User Details"] = JSON.parse(body).user;
-
-           // }
-
-            console.log(JSON.stringify(res));
-            callback(null,res);
-            //getXApiResponse();
-        });
-        console.log('before assume' + process.env.REGION);
-        /*sts.assumeRole(assumeRoleParams, function(err, assumedRole) {
-            if (err) callback(`Cannot assume role in CES account, check to see if role still exists: ${err}`);
-            else {
-
-                const requestOptions = {
-                    hostname: 'rightsuite-elb.eit-primary.eit.access.the-infra.com',
-                    path: '/acesWebService/rest/V1.0/services/getUserAccount',
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: reqBody
-                };
-
-
-                /*console.log("check :"+assumedRole.Credentials.AccessKeyId);
-                console.log("check SecretAccessKey:"+assumedRole.Credentials.SecretAccessKey);*//*
-
-                var signature = awss.sign(requestOptions, {
-                    accessKeyId: assumedRole.Credentials.AccessKeyId,
-                    secretAccessKey: assumedRole.Credentials.SecretAccessKey,
-                    sessionToken: assumedRole.Credentials.SessionToken
-                });
-
-                console.log('sign' + JSON.stringify(signature));
-
-                //signature.hostname = 'rightsuite-elb.eit-primary.eit.access.the-infra.com';
-                delete signature.headers["Content-Length"];
-                //  delete signature.headers.Host;
-                //  delete signature.headers["X-Amz-Security-Token"];
-                var tmp = signature.headers.Authorization + '';
-                signature.headers.Authorization = tmp.replace('content-length;', '');
-                // signature.headers.Host = 'rightsuite-elb.eit-primary.eit.access.the-infra.com';
-
-                const request = https.request(requestOptions, function(response) {
-                    console.log('entered request');
-                    //console.log(response.data);
-                    request.write(reqBody);
-                    var responseString = '';
-
-                    response.pipe(process.stdout);
-                    response.on('data', function(data) {
-                        responseString += data;
-                    });
-                    console.log(response.body);
-                    response.on('end', function() {
-                        console.log('request end');
-                        callback(null, responseString);
-                        console.log(responseString);
-                    });
-                });
-
-                /*console.log('here out of request');
-                console.log(this.httpResponse);
-            console.log(this.request.httpRequest);*//*
-
-                request.on('error', function(error) {
-                    console.log('request error : ');
-                    callback(error);
-                });
-
-                request.end();
+        request(requestOptions, function(err, response, body) {
+            if (err) {
+                console.log(err);
+                returnResponse(500,errorMsg("Unexpected Error : "+err));
+                return;
             }
-        });*/
+            if (response.statusCode != 200) {
+                returnResponse(400,errorMsg('Error in getUserAccount api. Status Code:' + response.statusCode));
+                log('error', 'Error in getUserAccount api. Status Code:' + response.statusCode);
+                return;
+            }
+            console.log("Get response: " + response.statusCode);
+            var apiResponse = JSON.parse(body);
+            if(apiResponse.status == 'ERROR'){
+                returnResponse(400,errorMsg('Could not fetch user details. Error:' + apiResponse.errorMessages));
+                log('error', 'Could not fetch user details. Error:' + apiResponse.errorMessages);
+                return;
+            }
+            res["User Details"] = JSON.parse(body).user;
+            if(res)
+            console.log(JSON.stringify(res));
+            
+            getAggregateResponse();
+        });
+
     }
 
-}
+    function returnResponse(status,resp) {
+        var responseApi = {
+            "statusCode": status,
+            "isBase64Encoded": false,
+            "body": JSON.stringify(resp)
+
+        };
+        callback(null, responseApi);
+    }
+
+};
