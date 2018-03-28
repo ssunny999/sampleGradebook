@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Outputs the time
+Description: GradeBook Sample Lambdas for fetching LRS data
 Resources:
   TimeFunction:
     Type: AWS::Serverless::Function
@@ -14,5 +14,35 @@ Resources:
           Properties:
             Path: /TimeResource
             Method: GET
+  GetUserDetailsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: GradeBookGetUserDetails
+      Handler: gradebook.handler
+      Runtime: nodejs6.10
+      CodeUri: ./getUserDetails
+      Policies: AmazonDynamoDBFullAccess
+      Events:
+        GradebookApi:
+          Type: Api
+          Properties:
+            Path: /gradebook/api/v1-0/getUserLrsdata/{user_id}
+            Method: GET
+  GetClassDetailsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: GradeBookGetClassDetails
+      Handler: gradebook.handler
+      Runtime: nodejs6.10
+      CodeUri: ./getClassDetails
+      Policies: AmazonDynamoDBFullAccess
+      Events:
+        GradebookApi:
+          Type: Api
+          Properties:
+            Path: /gradebook/api/v1-0/getClassDetails//org/{orgId}/class/{classId}
+            Method: GET
+
+            
 
 
