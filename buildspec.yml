@@ -4,8 +4,10 @@ phases:
   install:
     commands:
       - npm install --prefix ./timeResource time
-	  - npm install request
-	  - npm install aws4
+      - npm install --prefix ./getClassDetails request
+      - npm install --prefix ./getClassDetails aws4
+      - npm install --prefix ./getUserDetails request
+      - npm install --prefix ./getUserDetails aws4
       - aws cloudformation package --template-file samTemplate.yaml --s3-bucket sample-gradebook-build 
                                    --output-template-file outputSamTemplate.yaml
 artifacts:
