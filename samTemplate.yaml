@@ -42,7 +42,3 @@ Resources:
           Properties:
             Path: /gradebook/api/v1-0/getClassDetails//org/{orgId}/class/{classId}
             Method: GET
-
-            
-
-
