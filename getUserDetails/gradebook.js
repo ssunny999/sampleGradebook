@@ -63,7 +63,7 @@ exports.handler = (event, context, callback) => {
 
     function getAggregateResponse() {
 
-        var queryArray = [{ "$project": { "_id": 0, "statement": 1 } }, {
+        var queryArray = [{ "$project": { "_id": 0, "statement": 1, "lrs_id": 1 } }, {
             "$match": {
                 "statement.actor.account.name": userId
             }
