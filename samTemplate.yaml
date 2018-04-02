@@ -44,18 +44,12 @@ Resources:
             Method: GET
 
 GetUserDetailsFunctionVersion:
-			  Type: "AWS::Lambda::Alias"
+Type: "AWS::Lambda::Alias"
   Properties: 
     FunctionName: 
       Ref: "GradeBookGetUserDetails"
     FunctionVersion: 
       Fn::GetAtt: 
         - "TestingNewFeature"
-        - "Version"
+        - "0.1"
     Name: "GradeBookGetUserDetailsTest"
-	  UpdatePolicy:
-    CodeDeployLambdaAliasUpdate:
-      ApplicationName: !Ref CodeDeployApplication
-      DeploymentGroupName: !Ref CodeDeployDeploymentGroup
-      BeforeAllowTrafficHook: !Ref PreHookLambdaFunction
-      AfterAllowTrafficHook: !Ref PreHookLambdaFunction
