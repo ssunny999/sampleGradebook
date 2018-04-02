@@ -42,9 +42,9 @@ Resources:
           Properties:
             Path: /gradebook/api/v1-0/getClassDetails//org/{orgId}/class/{classId}
             Method: GET
-TestingNewFeature:
-  Type: "AWS::Lambda::Version"
-  Properties:
-    FunctionName:
-      Ref: "GradeBookGetUserDetails"
-    Description: "A test version of MyFunction"
+  TestingNewFeature:
+    Type: 'AWS::Lambda::Version'
+    Properties:
+        FunctionName:
+            Ref: GradeBookGetUserDetails
+        Description: 'A test version of MyFunction'
