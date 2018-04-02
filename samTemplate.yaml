@@ -42,3 +42,20 @@ Resources:
           Properties:
             Path: /gradebook/api/v1-0/getClassDetails//org/{orgId}/class/{classId}
             Method: GET
+
+GetUserDetailsFunctionVersion:
+			  Type: "AWS::Lambda::Alias"
+  Properties: 
+    FunctionName: 
+      Ref: "GradeBookGetUserDetails"
+    FunctionVersion: 
+      Fn::GetAtt: 
+        - "TestingNewFeature"
+        - "Version"
+    Name: "GradeBookGetUserDetailsTest"
+	  UpdatePolicy:
+    CodeDeployLambdaAliasUpdate:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: !Ref CodeDeployDeploymentGroup
+      BeforeAllowTrafficHook: !Ref PreHookLambdaFunction
+      AfterAllowTrafficHook: !Ref PreHookLambdaFunction
