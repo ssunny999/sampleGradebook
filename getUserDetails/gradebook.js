@@ -185,6 +185,7 @@ exports.handler = (event, context, callback) => {
                 return;
             }
             console.log("Get response: " + response.statusCode);
+			console.log("Get response 1: " + response.statusCode);
             var apiResponse = JSON.parse(body);
             if(apiResponse.status == 'ERROR'){
                 returnResponse(400,errorMsg('Could not fetch user details. Error:' + apiResponse.errorMessages));
