@@ -46,5 +46,5 @@ Resources:
     Type: 'AWS::Lambda::Version'
     Properties:
         FunctionName:
-            Ref: GradeBookGetUserDetails
+            Ref: GetUserDetailsFunction
         Description: 'A test version of MyFunction'
