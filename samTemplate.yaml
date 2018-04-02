@@ -42,13 +42,11 @@ Resources:
           Properties:
             Path: /gradebook/api/v1-0/getClassDetails//org/{orgId}/class/{classId}
             Method: GET
-	GetUserDetailsFunctionVersion:
-   Type: "AWS::Lambda::Alias"
-   Properties: 
-    FunctionName: 
-      Ref: "GradeBookGetUserDetails"
-    FunctionVersion: 
-      Fn::GetAtt: 
-        - "TestingNewFeature"
-        - "0.1"
-    Name: "GradeBookGetUserDetailsTest"
+GetUserDetailsFunctionVersion:
+    Type: 'AWS::Lambda::Alias'
+    Properties:
+        FunctionName:
+            Ref: GradeBookGetUserDetails
+        FunctionVersion:
+            'Fn::GetAtt': [TestingNewFeature, '0.1']
+        Name: GradeBookGetUserDetailsTest
