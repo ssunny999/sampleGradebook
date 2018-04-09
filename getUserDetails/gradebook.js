@@ -132,7 +132,7 @@ exports.handler = (event, context, callback) => {
         });
     }
 
-    function getDynamoDbResponse(keyJson) {
+    function getDynamoDbResponse(keyJson ) {
         var table = 'GradeBookSample';
         keyJson = [{ EXTERNAL_ID: { S: 'OUPDIS03' } }];
         var requestitems = {};
